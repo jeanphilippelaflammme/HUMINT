@@ -211,3 +211,45 @@ Voici les options à explorer selon tes besoins :
     Interface avancée avec dashboard, filtres et recherche
 
     Ajout de scénarios HUMINT ou missions automatisées
+
+
+from flask import Flask, render_template, request, session, redirect, url_for
+from chat_module import repondre_au_message
+import json
+import os
+
+app = Flask(__name__)
+app.secret_key = "supersecret"  # à remplacer par un vrai secret
+
+# Chargement des profils
+with open("profils.json", "r", encoding="utf-8") as f:
+    profils = json.load(f)
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        profil_id = request.form["profil_id"]
+        session["profil_id"] = profil_id
+        session["chat"] = []  # réinitialise la conversation
+        return redirect(url_for("chat"))
+    return render_template("index.html", profils=profils)
+
+@app.route("/chat", methods=["GET", "POST"])
+def chat():
+    if "profil_id" not in session:
+        return redirect(url_for("index"))
+
+    profil = profils[int(session["profil_id"])]
+    historique = session.get("chat", [])
+
+    if request.method == "POST":
+        message = request.form["message"]
+        historique.append({"role": "user", "content": message})
+        reponse = repondre_au_message(profil, message, historique)
+        historique.append({"role": "assistant", "content": reponse})
+        session["chat"] = historique
+
+    return render_template("chat.html", profil=profil, historique=historique)
+
+if __name__ == "__main__":
+    app.run(debug=True)
